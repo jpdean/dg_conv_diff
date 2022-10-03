@@ -5,7 +5,7 @@ from mpi4py import MPI
 from petsc4py import PETSc
 import numpy as np
 
-n = 16
+n = 32
 k = 1
 t_end = 1.0
 num_time_steps = 32
@@ -18,7 +18,7 @@ u, v = ufl.TrialFunction(V), ufl.TestFunction(V)
 u_n = fem.Function(V)
 u_n.interpolate(lambda x: np.sin(np.pi * x[0]) * np.sin(np.pi * x[1]))
 
-w = ufl.as_vector((1.0, 0.0))
+w = fem.Constant(msh, np.array([1.0, 0.0], dtype=PETSc.ScalarType))
 
 h = ufl.CellDiameter(msh)
 n = ufl.FacetNormal(msh)
@@ -26,7 +26,7 @@ n = ufl.FacetNormal(msh)
 delta_t = fem.Constant(msh, PETSc.ScalarType(t_end / num_time_steps))
 alpha = fem.Constant(
     msh, PETSc.ScalarType(10.0 * k**2))  # TODO Check k dependency
-kappa = fem.Constant(msh, PETSc.ScalarType(0.01))
+kappa = fem.Constant(msh, PETSc.ScalarType(0.0))
 
 w_uw = (dot(w, n) + abs(dot(w, n))) / 2.0
 # FIXME CHECK CONV TERM / CHANGING THIS TO VERSION WITH NORMAL
