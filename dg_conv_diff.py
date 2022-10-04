@@ -22,7 +22,7 @@ class TimeDependentExpression():
 
 n = 32
 k = 1
-t_end = 1.0
+t_end = 5.0
 num_time_steps = 32
 
 msh = mesh.create_unit_square(MPI.COMM_WORLD, n, n)
@@ -31,7 +31,7 @@ V = fem.FunctionSpace(msh, ("Discontinuous Lagrange", k))
 
 u, v = ufl.TrialFunction(V), ufl.TestFunction(V)
 u_n = fem.Function(V)
-u_n.interpolate(lambda x: np.sin(np.pi * x[0]) * np.sin(np.pi * x[1]))
+# u_n.interpolate(lambda x: np.sin(np.pi * x[0]) * np.sin(np.pi * x[1]))
 
 w = fem.Constant(msh, np.array([1.0, 0.0], dtype=PETSc.ScalarType))
 
@@ -44,7 +44,7 @@ alpha = fem.Constant(
 kappa = fem.Constant(msh, PETSc.ScalarType(0.01))
 
 u_D_expr = TimeDependentExpression(
-    lambda x, t: np.sin(np.pi * t) * np.cos(np.pi * x[1]))
+    lambda x, t: 1 * (x[0] - (1 - np.exp(100 * x[0])) / (1 - np.exp(100))))
 u_D = fem.Function(V)
 u_D.interpolate(u_D_expr)
 
@@ -63,7 +63,7 @@ a = fem.form(inner(u / delta_t, v) * dx -
                       inner(grad(v), u * n) * ds +
                       (alpha / h) * inner(u, v) * ds))
 
-f = fem.Constant(msh, PETSc.ScalarType(0.0))
+f = fem.Constant(msh, PETSc.ScalarType(1.0))
 L = fem.form(inner(f + u_n / delta_t, v) * dx -
              inner((1 - lmbda) * dot(w, n) * u_D, v) * ds +
              kappa * (- inner(u_n * n, grad(v)) * ds +
