@@ -64,7 +64,8 @@ a = fem.form(inner(u / delta_t, v) * dx -
                       (alpha / h) * inner(u, v) * ds))
 
 f = fem.Constant(msh, PETSc.ScalarType(0.0))
-L = fem.form(inner(f + u_n / delta_t, v) * dx)
+L = fem.form(inner(f + u_n / delta_t, v) * dx -
+             inner((1 - lmbda) * dot(w, n) * u_D, v) * ds)
 
 A = fem.petsc.assemble_matrix(a)
 A.assemble()
@@ -82,6 +83,9 @@ t = 0.0
 u_file.write(t)
 for n in range(num_time_steps):
     t += delta_t.value
+
+    u_D_expr.t = t
+    u_D.interpolate(u_D_expr)
 
     with b.localForm() as b_loc:
         b_loc.set(0.0)
