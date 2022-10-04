@@ -53,7 +53,7 @@ lmbda = ufl.conditional(ufl.gt(dot(w, n), 0), 1, 0)
 a = fem.form(inner(u / delta_t, v) * dx -
              inner(w * u, grad(v)) * dx +
              inner(lmbda("+") * dot(w("+"), n("+")) * u("+") -
-                   lmbda("-") * dot(w("-"), n("-")) * u("+"), jump(v)) * dS +
+                   lmbda("-") * dot(w("-"), n("-")) * u("-"), jump(v)) * dS +
              inner(lmbda * dot(w, n) * u, v) * ds +
              kappa * (inner(grad(u), grad(v)) * dx -
                       inner(avg(grad(u)), jump(v, n)) * dS -
