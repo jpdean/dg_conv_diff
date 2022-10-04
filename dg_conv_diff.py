@@ -69,7 +69,8 @@ L = fem.form(inner(f + u_n / delta_t, v) * dx -
              kappa * (- inner(u_n * n, grad(v)) * ds +
              (alpha / h) * inner(u_D, v) * ds))
 
-A = fem.petsc.create_matrix(a)
+A = fem.petsc.assemble_matrix(a)
+A.assemble()
 b = fem.petsc.create_vector(L)
 
 ksp = PETSc.KSP().create(msh.comm)
@@ -87,10 +88,6 @@ for n in range(num_time_steps):
 
     u_D_expr.t = t
     u_D.interpolate(u_D_expr)
-
-    A.zeroEntries()
-    fem.petsc.assemble_matrix(A, a)
-    A.assemble()
 
     with b.localForm() as b_loc:
         b_loc.set(0.0)
