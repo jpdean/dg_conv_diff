@@ -1,9 +1,24 @@
+# TODO Test diffusion, advection, advection-diffusion, and add Neumann
+# BC for Diffusion
+
 from dolfinx import mesh, fem, io
 import ufl
 from ufl import inner, dx, grad, dot, dS, jump, ds, avg
 from mpi4py import MPI
 from petsc4py import PETSc
 import numpy as np
+
+
+class TimeDependentExpression():
+    """Simple class to represent time dependent functions"""
+
+    def __init__(self, expression):
+        self.t = 0.0
+        self.expression = expression
+
+    def __call__(self, x):
+        return self.expression(x, self.t)
+
 
 n = 32
 k = 1
@@ -18,6 +33,11 @@ u, v = ufl.TrialFunction(V), ufl.TestFunction(V)
 u_n = fem.Function(V)
 u_n.interpolate(lambda x: np.sin(np.pi * x[0]) * np.sin(np.pi * x[1]))
 
+u_D_expr = TimeDependentExpression(
+    lambda x, t: np.sin(np.pi * t) * np.cos(np.pi * x[1]))
+u_D = fem.Function(V)
+u_D.interpolate(u_D_expr)
+
 w = fem.Constant(msh, np.array([1.0, 0.0], dtype=PETSc.ScalarType))
 
 h = ufl.CellDiameter(msh)
@@ -28,12 +48,13 @@ alpha = fem.Constant(
     msh, PETSc.ScalarType(10.0 * k**2))  # TODO Check k dependency
 kappa = fem.Constant(msh, PETSc.ScalarType(0.0))
 
-w_uw = (dot(w, n) + abs(dot(w, n))) / 2.0
+lmbda = ufl.conditional(ufl.gt(dot(w, n), 0), 1, 0)
 # FIXME CHECK CONV TERM / CHANGING THIS TO VERSION WITH NORMAL
 a = fem.form(inner(u / delta_t, v) * dx -
              inner(w * u, grad(v)) * dx +
-             inner(w_uw("+") * u("+") - w_uw("-") * u("-"), jump(v)) * dS +
-             inner(w_uw * u, v) * ds +
+             inner(lmbda("+") * dot(w("+"), n("+")) * u("+") -
+                   lmbda("-") * dot(w("-"), n("-")) * u("+"), jump(v)) * dS +
+             inner(lmbda * dot(w, n) * u, v) * ds +
              kappa * (inner(grad(u), grad(v)) * dx -
                       inner(avg(grad(u)), jump(v, n)) * dS -
                       inner(jump(u, n), avg(grad(v))) * dS +
