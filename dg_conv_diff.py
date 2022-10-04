@@ -38,7 +38,7 @@ u_D_expr = TimeDependentExpression(
 u_D = fem.Function(V)
 u_D.interpolate(u_D_expr)
 
-w = fem.Constant(msh, np.array([0.0, 0.0], dtype=PETSc.ScalarType))
+w = fem.Constant(msh, np.array([1.0, 0.0], dtype=PETSc.ScalarType))
 
 h = ufl.CellDiameter(msh)
 n = ufl.FacetNormal(msh)
@@ -46,7 +46,7 @@ n = ufl.FacetNormal(msh)
 delta_t = fem.Constant(msh, PETSc.ScalarType(t_end / num_time_steps))
 alpha = fem.Constant(
     msh, PETSc.ScalarType(10.0 * k**2))  # TODO Check k dependency
-kappa = fem.Constant(msh, PETSc.ScalarType(1.0))
+kappa = fem.Constant(msh, PETSc.ScalarType(0.0))
 
 lmbda = ufl.conditional(ufl.gt(dot(w, n), 0), 1, 0)
 # FIXME CHECK CONV TERM / CHANGING THIS TO VERSION WITH NORMAL
@@ -65,12 +65,11 @@ a = fem.form(inner(u / delta_t, v) * dx -
 
 f = fem.Constant(msh, PETSc.ScalarType(0.0))
 L = fem.form(inner(f + u_n / delta_t, v) * dx -
-             inner((1 - lmbda) * dot(w, n) * u_D, v) * ds -
-             inner(u_n * n, grad(v)) * ds +
-             (alpha / h) * inner(u_D, v) * ds)
+             inner((1 - lmbda) * dot(w, n) * u_D, v) * ds +
+             kappa * (- inner(u_n * n, grad(v)) * ds +
+             (alpha / h) * inner(u_D, v) * ds))
 
-A = fem.petsc.assemble_matrix(a)
-A.assemble()
+A = fem.petsc.create_matrix(a)
 b = fem.petsc.create_vector(L)
 
 ksp = PETSc.KSP().create(msh.comm)
@@ -88,6 +87,10 @@ for n in range(num_time_steps):
 
     u_D_expr.t = t
     u_D.interpolate(u_D_expr)
+
+    A.zeroEntries()
+    fem.petsc.assemble_matrix(A, a)
+    A.assemble()
 
     with b.localForm() as b_loc:
         b_loc.set(0.0)
