@@ -9,6 +9,16 @@ from petsc4py import PETSc
 import numpy as np
 
 
+def norm_L2(comm, v):
+    """Compute the L2(Ω)-norm of v"""
+    return np.sqrt(comm.allreduce(
+        fem.assemble_scalar(fem.form(inner(v, v) * dx)), op=MPI.SUM))
+
+
+def u_e_expr(x):
+    return x[0] - (1 - np.exp(100 * x[0])) / (1 - np.exp(100))
+
+
 class TimeDependentExpression():
     """Simple class to represent time dependent functions"""
 
@@ -20,7 +30,7 @@ class TimeDependentExpression():
         return self.expression(x, self.t)
 
 
-n = 32
+n = 64
 k = 1
 t_end = 5.0
 num_time_steps = 32
@@ -43,10 +53,10 @@ alpha = fem.Constant(
     msh, PETSc.ScalarType(10.0 * k**2))  # TODO Check k dependency
 kappa = fem.Constant(msh, PETSc.ScalarType(0.01))
 
-u_D_expr = TimeDependentExpression(
-    lambda x, t: 1 * (x[0] - (1 - np.exp(100 * x[0])) / (1 - np.exp(100))))
+# u_D_expr = TimeDependentExpression(
+#     lambda x, t: )
 u_D = fem.Function(V)
-u_D.interpolate(u_D_expr)
+u_D.interpolate(u_e_expr)
 
 lmbda = ufl.conditional(ufl.gt(dot(w, n), 0), 1, 0)
 # FIXME CHECK CONV TERM / CHANGING THIS TO VERSION WITH NORMAL
@@ -86,8 +96,8 @@ u_file.write(t)
 for n in range(num_time_steps):
     t += delta_t.value
 
-    u_D_expr.t = t
-    u_D.interpolate(u_D_expr)
+    # u_D_expr.t = t
+    # u_D.interpolate(u_D_expr)
 
     with b.localForm() as b_loc:
         b_loc.set(0.0)
@@ -100,3 +110,15 @@ for n in range(num_time_steps):
     u_file.write(t)
 
 u_file.close()
+
+# Function spaces for exact solution
+V_e = fem.FunctionSpace(msh, ("Lagrange", k + 3))
+
+u_e = fem.Function(V_e)
+u_e.interpolate(u_e_expr)
+
+# Compute errors
+e_u = norm_L2(msh.comm, u_n - u_e)
+
+if msh.comm.rank == 0:
+    print(f"e_u = {e_u}")
