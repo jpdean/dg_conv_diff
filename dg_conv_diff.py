@@ -17,7 +17,7 @@ def norm_L2(comm, v):
 
 def u_e_expr(x):
     """Analytical solution to steady state problem from Donea and Huerta"""
-    return x[0] - (1 - np.exp(100 * x[0])) / (1 - np.exp(100))
+    return np.zeros_like(x[0])
 
 
 def gamma_D_marker(x):
@@ -50,8 +50,9 @@ V = fem.FunctionSpace(msh, ("Discontinuous Lagrange", k))
 
 u, v = ufl.TrialFunction(V), ufl.TestFunction(V)
 u_n = fem.Function(V)
-u_n.interpolate(lambda x: np.sin(np.pi * x[0]) * np.sin(np.pi * x[1]))
+# u_n.interpolate(lambda x: np.sin(np.pi * x[0]) * np.sin(np.pi * x[1]))
 
+x = ufl.SpatialCoordinate(msh)
 w = fem.Constant(msh, np.array([1.0, 0.0], dtype=PETSc.ScalarType))
 
 h = ufl.CellDiameter(msh)
@@ -98,7 +99,6 @@ a = fem.form(inner(u / delta_t, v) * dx -
                       (alpha / h) * inner(u, v) * ds(boundary_id["gamma_D"])))
 
 f = fem.Constant(msh, PETSc.ScalarType(1.0))
-# x = ufl.SpatialCoordinate(msh)
 g = fem.Constant(msh, PETSc.ScalarType(0.0))
 L = fem.form(inner(f + u_n / delta_t, v) * dx -
              inner((1 - lmbda) * dot(w, n) * u_D, v) * ds +
