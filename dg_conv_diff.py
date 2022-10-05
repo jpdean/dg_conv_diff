@@ -21,10 +21,14 @@ def u_e_expr(x):
 
 
 def gamma_D_marker(x):
-    return np.isclose(x[0], 0.0) |  np.isclose(x[0], 1.0)
+    return np.isclose(x[0], 0.0)
 
 
 def gamma_N_marker(x):
+    return np.isclose(x[0], 1.0)
+
+
+def gamma_R_marker(x):
     return np.isclose(x[1], 0.0) | np.isclose(x[1], 1.0)
 
 
@@ -39,7 +43,7 @@ class TimeDependentExpression():
         return self.expression(x, self.t)
 
 
-n = 64
+n = 32
 k = 1
 t_end = 10.0
 num_time_steps = 32
@@ -76,13 +80,19 @@ indices = np.arange(0, num_facets)
 values = np.arange(0, num_facets, dtype=np.intc)
 dirichlet_facets = mesh.locate_entities_boundary(msh, tdim - 1, gamma_D_marker)
 neumann_facets = mesh.locate_entities_boundary(msh, tdim - 1, gamma_N_marker)
-boundary_id = {"gamma_D": 1, "gamma_N": 2}
+robin_facets = mesh.locate_entities_boundary(msh, tdim - 1, gamma_R_marker)
+boundary_id = {"gamma_D": 1, "gamma_N": 2, "gamma_R": 3}
 values[dirichlet_facets] = boundary_id["gamma_D"]
 values[neumann_facets] = boundary_id["gamma_N"]
+values[robin_facets] = boundary_id["gamma_R"]
 mt = mesh.meshtags(msh, tdim - 1, indices, values)
 
 ds = ufl.Measure("ds", domain=msh, subdomain_data=mt)
 
+# Robin BCs (alpha_R * u + kappa * \partial u \ \partial n = beta_R on Gamma_R,
+# see Ern2004 p. 114)
+alpha_R = fem.Constant(msh, PETSc.ScalarType(1.0))
+beta_R = fem.Constant(msh, PETSc.ScalarType(1.0))
 lmbda = ufl.conditional(ufl.gt(dot(w, n), 0), 1, 0)
 # FIXME CHECK CONV TERM / CHANGING THIS TO VERSION WITH NORMAL
 a = fem.form(inner(u / delta_t, v) * dx -
@@ -96,15 +106,17 @@ a = fem.form(inner(u / delta_t, v) * dx -
                       (alpha / avg(h)) * inner(jump(u, n), jump(v, n)) * dS -
                       inner(grad(u), v * n) * ds(boundary_id["gamma_D"]) -
                       inner(grad(v), u * n) * ds(boundary_id["gamma_D"]) +
-                      (alpha / h) * inner(u, v) * ds(boundary_id["gamma_D"])))
+                      (alpha / h) * inner(u, v) * ds(boundary_id["gamma_D"]) +
+                      inner(alpha_R * u, v) * ds(boundary_id["gamma_R"])))
 
-f = fem.Constant(msh, PETSc.ScalarType(1.0))
+f = fem.Constant(msh, PETSc.ScalarType(0.0))
 g = fem.Constant(msh, PETSc.ScalarType(0.0))
 L = fem.form(inner(f + u_n / delta_t, v) * dx -
              inner((1 - lmbda) * dot(w, n) * u_D, v) * ds +
              kappa * (- inner(u_n * n, grad(v)) * ds(boundary_id["gamma_D"]) +
              (alpha / h) * inner(u_D, v) * ds(boundary_id["gamma_D"]) +
-             inner(g, v) * ds(boundary_id["gamma_N"])))
+             inner(g, v) * ds(boundary_id["gamma_N"]) +
+             inner(beta_R, v) * ds(boundary_id["gamma_R"])))
 
 A = fem.petsc.assemble_matrix(a)
 A.assemble()
