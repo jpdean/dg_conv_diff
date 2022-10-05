@@ -17,19 +17,19 @@ def norm_L2(comm, v):
 
 def u_e_expr(x):
     """Analytical solution to steady state problem from Donea and Huerta"""
-    return np.zeros_like(x[0])
+    return x[0] - (1 - np.exp(100 * x[0])) / (1 - np.exp(100))
 
 
 def gamma_D_marker(x):
-    return np.isclose(x[0], 0.0)
+    return np.isclose(x[0], 0.0) |  np.isclose(x[0], 1.0)
 
 
 def gamma_N_marker(x):
-    return np.isclose(x[0], 1.0)
+    return np.isclose(x[1], 0.0) | np.isclose(x[1], 1.0)
 
 
 def gamma_R_marker(x):
-    return np.isclose(x[1], 0.0) | np.isclose(x[1], 1.0)
+    return np.full(x[0].shape, False)
 
 
 class TimeDependentExpression():
@@ -54,11 +54,9 @@ V = fem.FunctionSpace(msh, ("Discontinuous Lagrange", k))
 
 u, v = ufl.TrialFunction(V), ufl.TestFunction(V)
 u_n = fem.Function(V)
-# u_n.interpolate(lambda x: np.sin(np.pi * x[0]) * np.sin(np.pi * x[1]))
+u_n.interpolate(lambda x: np.sin(np.pi * x[0]) * np.sin(np.pi * x[1]))
 
-x = ufl.SpatialCoordinate(msh)
-w = ufl.as_vector((4 * x[1] * (1 - x[1]), 0.0))
-# w = fem.Constant(msh, np.array([0.0, 0.0], dtype=PETSc.ScalarType))
+w = fem.Constant(msh, np.array([1.0, 0.0], dtype=PETSc.ScalarType))
 
 h = ufl.CellDiameter(msh)
 n = ufl.FacetNormal(msh)
@@ -92,8 +90,8 @@ ds = ufl.Measure("ds", domain=msh, subdomain_data=mt)
 
 # Robin BCs (alpha_R * u + kappa * \partial u \ \partial n = beta_R on Gamma_R,
 # see Ern2004 p. 114)
-alpha_R = fem.Constant(msh, PETSc.ScalarType(1.0))
-beta_R = fem.Constant(msh, PETSc.ScalarType(1.0))
+alpha_R = fem.Constant(msh, PETSc.ScalarType(0.0))
+beta_R = fem.Constant(msh, PETSc.ScalarType(0.0))
 lmbda = ufl.conditional(ufl.gt(dot(w, n), 0), 1, 0)
 # FIXME CHECK CONV TERM / CHANGING THIS TO VERSION WITH NORMAL
 a = fem.form(inner(u / delta_t, v) * dx -
@@ -110,7 +108,7 @@ a = fem.form(inner(u / delta_t, v) * dx -
                       (alpha / h) * inner(u, v) * ds(boundary_id["gamma_D"]) +
                       inner(alpha_R * u, v) * ds(boundary_id["gamma_R"])))
 
-f = fem.Constant(msh, PETSc.ScalarType(0.0))
+f = fem.Constant(msh, PETSc.ScalarType(1.0))
 g = fem.Constant(msh, PETSc.ScalarType(0.0))
 L = fem.form(inner(f + u_n / delta_t, v) * dx -
              inner((1 - lmbda) * dot(w, n) * u_D, v) * ds +
