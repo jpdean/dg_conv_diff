@@ -57,7 +57,8 @@ u_n = fem.Function(V)
 # u_n.interpolate(lambda x: np.sin(np.pi * x[0]) * np.sin(np.pi * x[1]))
 
 x = ufl.SpatialCoordinate(msh)
-w = fem.Constant(msh, np.array([1.0, 0.0], dtype=PETSc.ScalarType))
+w = ufl.as_vector((4 * x[1] * (1 - x[1]), 0.0))
+# w = fem.Constant(msh, np.array([0.0, 0.0], dtype=PETSc.ScalarType))
 
 h = ufl.CellDiameter(msh)
 n = ufl.FacetNormal(msh)
