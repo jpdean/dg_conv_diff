@@ -3,7 +3,7 @@
 
 from dolfinx import mesh, fem, io
 import ufl
-from ufl import inner, dx, grad, dot, dS, jump, ds, avg
+from ufl import inner, dx, grad, dot, dS, jump, avg
 from mpi4py import MPI
 from petsc4py import PETSc
 import numpy as np
@@ -16,7 +16,16 @@ def norm_L2(comm, v):
 
 
 def u_e_expr(x):
-    return x[0] - (1 - np.exp(100 * x[0])) / (1 - np.exp(100))
+    # return x[0] - (1 - np.exp(100 * x[0])) / (1 - np.exp(100))
+    return np.zeros_like(x[0])
+
+
+def gamma_D_marker(x):
+    return np.isclose(x[0], 0.0) | np.isclose(x[1], 0.0) | np.isclose(x[1], 1.0)
+
+
+def gamma_N_marker(x):
+    return np.isclose(x[0], 1.0)
 
 
 class TimeDependentExpression():
@@ -43,7 +52,7 @@ u, v = ufl.TrialFunction(V), ufl.TestFunction(V)
 u_n = fem.Function(V)
 # u_n.interpolate(lambda x: np.sin(np.pi * x[0]) * np.sin(np.pi * x[1]))
 
-w = fem.Constant(msh, np.array([1.0, 0.0], dtype=PETSc.ScalarType))
+w = fem.Constant(msh, np.array([0.0, 0.0], dtype=PETSc.ScalarType))
 
 h = ufl.CellDiameter(msh)
 n = ufl.FacetNormal(msh)
@@ -51,12 +60,27 @@ n = ufl.FacetNormal(msh)
 delta_t = fem.Constant(msh, PETSc.ScalarType(t_end / num_time_steps))
 alpha = fem.Constant(
     msh, PETSc.ScalarType(10.0 * k**2))  # TODO Check k dependency
-kappa = fem.Constant(msh, PETSc.ScalarType(0.01))
+kappa = fem.Constant(msh, PETSc.ScalarType(1.0))
 
 # u_D_expr = TimeDependentExpression(
 #     lambda x, t: )
 u_D = fem.Function(V)
 u_D.interpolate(u_e_expr)
+
+tdim = msh.topology.dim
+msh.topology.create_entities(tdim - 1)
+facet_imap = msh.topology.index_map(tdim - 1)
+num_facets = facet_imap.size_local + facet_imap.num_ghosts
+indices = np.arange(0, num_facets)
+values = np.arange(0, num_facets, dtype=np.intc)
+dirichlet_facets = mesh.locate_entities_boundary(msh, tdim - 1, gamma_D_marker)
+neumann_facets = mesh.locate_entities_boundary(msh, tdim - 1, gamma_N_marker)
+boundary_id = {"gamma_D": 1, "gamma_N": 2}
+values[dirichlet_facets] = boundary_id["gamma_D"]
+values[neumann_facets] = boundary_id["gamma_N"]
+mt = mesh.meshtags(msh, tdim - 1, indices, values)
+
+ds = ufl.Measure("ds", domain=msh, subdomain_data=mt)
 
 lmbda = ufl.conditional(ufl.gt(dot(w, n), 0), 1, 0)
 # FIXME CHECK CONV TERM / CHANGING THIS TO VERSION WITH NORMAL
@@ -69,15 +93,18 @@ a = fem.form(inner(u / delta_t, v) * dx -
                       inner(avg(grad(u)), jump(v, n)) * dS -
                       inner(jump(u, n), avg(grad(v))) * dS +
                       (alpha / avg(h)) * inner(jump(u, n), jump(v, n)) * dS -
-                      inner(grad(u), v * n) * ds -
-                      inner(grad(v), u * n) * ds +
-                      (alpha / h) * inner(u, v) * ds))
+                      inner(grad(u), v * n) * ds(boundary_id["gamma_D"]) -
+                      inner(grad(v), u * n) * ds(boundary_id["gamma_D"]) +
+                      (alpha / h) * inner(u, v) * ds(boundary_id["gamma_D"])))
 
 f = fem.Constant(msh, PETSc.ScalarType(1.0))
+x = ufl.SpatialCoordinate(msh)
+g = ufl.sin(ufl.pi * x[1])
 L = fem.form(inner(f + u_n / delta_t, v) * dx -
              inner((1 - lmbda) * dot(w, n) * u_D, v) * ds +
-             kappa * (- inner(u_n * n, grad(v)) * ds +
-             (alpha / h) * inner(u_D, v) * ds))
+             kappa * (- inner(u_n * n, grad(v)) * ds(boundary_id["gamma_D"]) +
+             (alpha / h) * inner(u_D, v) * ds(boundary_id["gamma_D"]) +
+             inner(g, v) * ds(boundary_id["gamma_N"])))
 
 A = fem.petsc.assemble_matrix(a)
 A.assemble()
