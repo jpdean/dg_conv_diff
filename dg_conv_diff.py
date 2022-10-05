@@ -41,7 +41,7 @@ class TimeDependentExpression():
 
 n = 64
 k = 1
-t_end = 5.0
+t_end = 10.0
 num_time_steps = 32
 
 msh = mesh.create_unit_square(MPI.COMM_WORLD, n, n)
@@ -50,7 +50,7 @@ V = fem.FunctionSpace(msh, ("Discontinuous Lagrange", k))
 
 u, v = ufl.TrialFunction(V), ufl.TestFunction(V)
 u_n = fem.Function(V)
-# u_n.interpolate(lambda x: np.sin(np.pi * x[0]) * np.sin(np.pi * x[1]))
+u_n.interpolate(lambda x: np.sin(np.pi * x[0]) * np.sin(np.pi * x[1]))
 
 w = fem.Constant(msh, np.array([1.0, 0.0], dtype=PETSc.ScalarType))
 
@@ -132,6 +132,7 @@ for n in range(num_time_steps):
     b.ghostUpdate(addv=PETSc.InsertMode.ADD, mode=PETSc.ScatterMode.REVERSE)
 
     ksp.solve(b, u_n.vector)
+    print(u_n.vector.norm())
     u_n.x.scatter_forward()
 
     u_file.write(t)
