@@ -132,7 +132,6 @@ for n in range(num_time_steps):
     b.ghostUpdate(addv=PETSc.InsertMode.ADD, mode=PETSc.ScatterMode.REVERSE)
 
     ksp.solve(b, u_n.vector)
-    print(u_n.vector.norm())
     u_n.x.scatter_forward()
 
     u_file.write(t)
