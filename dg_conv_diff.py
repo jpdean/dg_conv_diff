@@ -16,16 +16,16 @@ def norm_L2(comm, v):
 
 
 def u_e_expr(x):
-    # return x[0] - (1 - np.exp(100 * x[0])) / (1 - np.exp(100))
-    return np.zeros_like(x[0])
+    """Analytical solution to steady state problem from Donea and Huerta"""
+    return x[0] - (1 - np.exp(100 * x[0])) / (1 - np.exp(100))
 
 
 def gamma_D_marker(x):
-    return np.isclose(x[0], 0.0) | np.isclose(x[1], 0.0) | np.isclose(x[1], 1.0)
+    return np.isclose(x[0], 0.0) |  np.isclose(x[0], 1.0)
 
 
 def gamma_N_marker(x):
-    return np.isclose(x[0], 1.0)
+    return np.isclose(x[1], 0.0) | np.isclose(x[1], 1.0)
 
 
 class TimeDependentExpression():
@@ -52,7 +52,7 @@ u, v = ufl.TrialFunction(V), ufl.TestFunction(V)
 u_n = fem.Function(V)
 # u_n.interpolate(lambda x: np.sin(np.pi * x[0]) * np.sin(np.pi * x[1]))
 
-w = fem.Constant(msh, np.array([0.0, 0.0], dtype=PETSc.ScalarType))
+w = fem.Constant(msh, np.array([1.0, 0.0], dtype=PETSc.ScalarType))
 
 h = ufl.CellDiameter(msh)
 n = ufl.FacetNormal(msh)
@@ -60,7 +60,7 @@ n = ufl.FacetNormal(msh)
 delta_t = fem.Constant(msh, PETSc.ScalarType(t_end / num_time_steps))
 alpha = fem.Constant(
     msh, PETSc.ScalarType(10.0 * k**2))  # TODO Check k dependency
-kappa = fem.Constant(msh, PETSc.ScalarType(1.0))
+kappa = fem.Constant(msh, PETSc.ScalarType(0.01))
 
 # u_D_expr = TimeDependentExpression(
 #     lambda x, t: )
@@ -98,8 +98,8 @@ a = fem.form(inner(u / delta_t, v) * dx -
                       (alpha / h) * inner(u, v) * ds(boundary_id["gamma_D"])))
 
 f = fem.Constant(msh, PETSc.ScalarType(1.0))
-x = ufl.SpatialCoordinate(msh)
-g = ufl.sin(ufl.pi * x[1])
+# x = ufl.SpatialCoordinate(msh)
+g = fem.Constant(msh, PETSc.ScalarType(0.0))
 L = fem.form(inner(f + u_n / delta_t, v) * dx -
              inner((1 - lmbda) * dot(w, n) * u_D, v) * ds +
              kappa * (- inner(u_n * n, grad(v)) * ds(boundary_id["gamma_D"]) +
