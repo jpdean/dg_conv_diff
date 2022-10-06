@@ -43,7 +43,7 @@ class TimeDependentExpression():
         return self.expression(x, self.t)
 
 
-n = 32
+n = 64
 k = 1
 t_end = 10.0
 num_time_steps = 32
@@ -114,7 +114,7 @@ for bc in dirichlet_bcs:
                   inner(grad(v), u * n) * ds(bc[0]) +
                   (alpha / h) * inner(u, v) * ds(bc[0]))
     L += - inner((1 - lmbda) * dot(w, n) * u_D, v) * ds(bc[0]) + \
-        kappa * (- inner(u_n * n, grad(v)) * ds(bc[0]) +  # FIXME Why is this u_n?
+        kappa * (- inner(u_D * n, grad(v)) * ds(bc[0]) +  # FIXME Why is this u_n?
                  (alpha / h) * inner(u_D, v) * ds(bc[0]))
 
 for bc in neumann_bcs:
