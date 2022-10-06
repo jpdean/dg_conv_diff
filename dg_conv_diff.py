@@ -21,7 +21,7 @@ def u_e_expr(x):
 
 
 def gamma_D_marker(x):
-    return np.isclose(x[0], 0.0) |  np.isclose(x[0], 1.0)
+    return np.isclose(x[0], 0.0) | np.isclose(x[0], 1.0)
 
 
 def gamma_N_marker(x):
@@ -43,7 +43,7 @@ class TimeDependentExpression():
         return self.expression(x, self.t)
 
 
-n = 32
+n = 64
 k = 1
 t_end = 10.0
 num_time_steps = 32
@@ -66,10 +66,6 @@ alpha = fem.Constant(
     msh, PETSc.ScalarType(10.0 * k**2))  # TODO Check k dependency
 kappa = fem.Constant(msh, PETSc.ScalarType(0.01))
 
-# u_D_expr = TimeDependentExpression(
-#     lambda x, t: )
-u_D = fem.Function(V)
-u_D.interpolate(u_e_expr)
 
 tdim = msh.topology.dim
 msh.topology.create_entities(tdim - 1)
@@ -88,34 +84,51 @@ mt = mesh.meshtags(msh, tdim - 1, indices, values)
 
 ds = ufl.Measure("ds", domain=msh, subdomain_data=mt)
 
+dirichlet_bcs = {(boundary_id["gamma_D"], u_e_expr)}
+neumann_bcs = {(boundary_id["gamma_N"], lambda x: np.zeros_like(x[0]))}
 # Robin BCs (alpha_R * u + kappa * \partial u \ \partial n = beta_R on Gamma_R,
 # see Ern2004 p. 114)
 alpha_R = fem.Constant(msh, PETSc.ScalarType(0.0))
 beta_R = fem.Constant(msh, PETSc.ScalarType(0.0))
+robin_bcs = {(boundary_id["gamma_R"], (alpha_R, beta_R))}
+
 lmbda = ufl.conditional(ufl.gt(dot(w, n), 0), 1, 0)
 # FIXME CHECK CONV TERM / CHANGING THIS TO VERSION WITH NORMAL
-a = fem.form(inner(u / delta_t, v) * dx -
-             inner(w * u, grad(v)) * dx +
-             inner(lmbda("+") * dot(w("+"), n("+")) * u("+") -
-                   lmbda("-") * dot(w("-"), n("-")) * u("-"), jump(v)) * dS +
-             inner(lmbda * dot(w, n) * u, v) * ds +
-             kappa * (inner(grad(u), grad(v)) * dx -
-                      inner(avg(grad(u)), jump(v, n)) * dS -
-                      inner(jump(u, n), avg(grad(v))) * dS +
-                      (alpha / avg(h)) * inner(jump(u, n), jump(v, n)) * dS -
-                      inner(grad(u), v * n) * ds(boundary_id["gamma_D"]) -
-                      inner(grad(v), u * n) * ds(boundary_id["gamma_D"]) +
-                      (alpha / h) * inner(u, v) * ds(boundary_id["gamma_D"]) +
-                      inner(alpha_R * u, v) * ds(boundary_id["gamma_R"])))
+a = inner(u / delta_t, v) * dx - \
+    inner(w * u, grad(v)) * dx + \
+    inner(lmbda("+") * dot(w("+"), n("+")) * u("+") -
+          lmbda("-") * dot(w("-"), n("-")) * u("-"), jump(v)) * dS + \
+    inner(lmbda * dot(w, n) * u, v) * ds + \
+    kappa * (inner(grad(u), grad(v)) * dx -
+             inner(avg(grad(u)), jump(v, n)) * dS -
+             inner(jump(u, n), avg(grad(v))) * dS +
+             (alpha / avg(h)) * inner(jump(u, n), jump(v, n)) * dS)
 
 f = fem.Constant(msh, PETSc.ScalarType(1.0))
-g = fem.Constant(msh, PETSc.ScalarType(0.0))
-L = fem.form(inner(f + u_n / delta_t, v) * dx -
-             inner((1 - lmbda) * dot(w, n) * u_D, v) * ds +
-             kappa * (- inner(u_n * n, grad(v)) * ds(boundary_id["gamma_D"]) +
-             (alpha / h) * inner(u_D, v) * ds(boundary_id["gamma_D"]) +
-             inner(g, v) * ds(boundary_id["gamma_N"]) +
-             inner(beta_R, v) * ds(boundary_id["gamma_R"])))
+L = inner(f + u_n / delta_t, v) * dx
+
+for bc in dirichlet_bcs:
+    u_D = fem.Function(V)
+    u_D.interpolate(bc[1])
+    a += kappa * (- inner(grad(u), v * n) * ds(bc[0]) -
+                  inner(grad(v), u * n) * ds(bc[0]) +
+                  (alpha / h) * inner(u, v) * ds(bc[0]))
+    L += - inner((1 - lmbda) * dot(w, n) * u_D, v) * ds(bc[0]) + \
+        kappa * (- inner(u_n * n, grad(v)) * ds(bc[0]) +  # FIXME Why is this u_n?
+                 (alpha / h) * inner(u_D, v) * ds(bc[0]))
+
+for bc in neumann_bcs:
+    g = fem.Function(V)
+    g.interpolate(bc[1])
+    L += kappa * inner(g, v) * ds(bc[0])
+
+for bc in robin_bcs:
+    alpha_R, beta_R = bc[1]
+    a += kappa * inner(alpha_R * u, v) * ds(bc[0])
+    L += kappa * inner(beta_R, v) * ds(bc[0])
+
+a = fem.form(a)
+L = fem.form(L)
 
 A = fem.petsc.assemble_matrix(a)
 A.assemble()
