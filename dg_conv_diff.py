@@ -114,7 +114,7 @@ for bc in dirichlet_bcs:
                   inner(grad(v), u * n) * ds(bc[0]) +
                   (alpha / h) * inner(u, v) * ds(bc[0]))
     L += - inner((1 - lmbda) * dot(w, n) * u_D, v) * ds(bc[0]) + \
-        kappa * (- inner(u_D * n, grad(v)) * ds(bc[0]) +  # FIXME Why is this u_n?
+        kappa * (- inner(u_D * n, grad(v)) * ds(bc[0]) +
                  (alpha / h) * inner(u_D, v) * ds(bc[0]))
 
 for bc in neumann_bcs:
