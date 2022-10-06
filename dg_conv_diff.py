@@ -43,7 +43,7 @@ class TimeDependentExpression():
         return self.expression(x, self.t)
 
 
-n = 64
+n = 32
 k = 1
 t_end = 10.0
 num_time_steps = 32
