@@ -94,7 +94,6 @@ beta_R = fem.Constant(msh, PETSc.ScalarType(0.0))
 robin_bcs = {(boundary_id["gamma_R"], (alpha_R, beta_R))}
 
 lmbda = ufl.conditional(ufl.gt(dot(w, n), 0), 1, 0)
-# FIXME CHECK CONV TERM / CHANGING THIS TO VERSION WITH NORMAL
 a = inner(u / delta_t, v) * dx - \
     inner(w * u, grad(v)) * dx + \
     inner(lmbda("+") * dot(w("+"), n("+")) * u("+") -
