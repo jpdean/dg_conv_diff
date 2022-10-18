@@ -33,17 +33,6 @@ def marker_Gamma_R(x):
     return np.full(x[0].shape, False)
 
 
-class TimeDependentExpression():
-    """Simple class to represent time dependent functions"""
-
-    def __init__(self, expression):
-        self.t = 0.0
-        self.expression = expression
-
-    def __call__(self, x):
-        return self.expression(x, self.t)
-
-
 n = 64
 k = 1
 t_end = 10.0
@@ -149,9 +138,6 @@ t = 0.0
 u_file.write(t)
 for n in range(num_time_steps):
     t += delta_t.value
-
-    # u_D_expr.t = t
-    # u_D.interpolate(u_D_expr)
 
     with b.localForm() as b_loc:
         b_loc.set(0.0)
