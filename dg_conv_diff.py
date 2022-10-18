@@ -17,7 +17,8 @@ def norm_L2(comm, v):
 
 def u_e_expr(x):
     """Analytical solution to steady state problem from Donea and Huerta"""
-    return x[0] - (1 - np.exp(100 * x[0])) / (1 - np.exp(100))
+    gamma = w_x / kappa
+    return 1 / w_x * (x[0] - (1 - np.exp(gamma * x[0])) / (1 - np.exp(gamma)))
 
 
 def gamma_D_marker(x):
