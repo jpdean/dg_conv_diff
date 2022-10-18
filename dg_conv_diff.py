@@ -48,6 +48,8 @@ k = 1
 t_end = 10.0
 num_time_steps = 32
 kappa = 0.01
+w_x = 1.0
+w_y = 0.0
 
 msh = mesh.create_unit_square(MPI.COMM_WORLD, n, n)
 
@@ -57,7 +59,7 @@ u, v = ufl.TrialFunction(V), ufl.TestFunction(V)
 u_n = fem.Function(V)
 u_n.interpolate(lambda x: np.sin(np.pi * x[0]) * np.sin(np.pi * x[1]))
 
-w = fem.Constant(msh, np.array([1.0, 0.0], dtype=PETSc.ScalarType))
+w = fem.Constant(msh, np.array([w_x, w_y], dtype=PETSc.ScalarType))
 
 h = ufl.CellDiameter(msh)
 n = ufl.FacetNormal(msh)
