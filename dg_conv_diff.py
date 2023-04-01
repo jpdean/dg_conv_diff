@@ -107,9 +107,9 @@ a = inner(u / delta_t, v) * dx - \
           lmbda("-") * dot(w("-"), n("-")) * u("-"), jump(v)) * dS + \
     inner(lmbda * dot(w, n) * u, v) * ds + \
     kappa_const * (inner(grad(u), grad(v)) * dx -
-             inner(avg(grad(u)), jump(v, n)) * dS -
-             inner(jump(u, n), avg(grad(v))) * dS +
-             (alpha / avg(h)) * inner(jump(u, n), jump(v, n)) * dS)
+                   inner(avg(grad(u)), jump(v, n)) * dS -
+                   inner(jump(u, n), avg(grad(v))) * dS +
+                   (alpha / avg(h)) * inner(jump(u, n), jump(v, n)) * dS)
 
 f = fem.Constant(msh, PETSc.ScalarType(1.0))
 L = inner(f + u_n / delta_t, v) * dx
@@ -119,11 +119,11 @@ for bc in dirichlet_bcs:
     u_D = fem.Function(V)
     u_D.interpolate(bc[1])
     a += kappa_const * (- inner(grad(u), v * n) * ds(bc[0]) -
-                  inner(grad(v), u * n) * ds(bc[0]) +
-                  (alpha / h) * inner(u, v) * ds(bc[0]))
+                        inner(grad(v), u * n) * ds(bc[0]) +
+                        (alpha / h) * inner(u, v) * ds(bc[0]))
     L += - inner((1 - lmbda) * dot(w, n) * u_D, v) * ds(bc[0]) + \
         kappa_const * (- inner(u_D * n, grad(v)) * ds(bc[0]) +
-                 (alpha / h) * inner(u_D, v) * ds(bc[0]))
+                       (alpha / h) * inner(u_D, v) * ds(bc[0]))
 
 for bc in neumann_bcs:
     g = fem.Function(V)
