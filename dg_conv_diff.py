@@ -103,8 +103,7 @@ robin_bcs = {(boundary_id["Gamma_R"], (alpha_R, beta_R))}
 lmbda = ufl.conditional(ufl.gt(dot(w, n), 0), 1, 0)
 a = inner(u / delta_t, v) * dx - \
     inner(w * u, grad(v)) * dx + \
-    inner(lmbda("+") * w("+") * u("+") +
-          lmbda("-") * w("-") * u("-"), jump(v, n)) * dS + \
+    inner(2 * avg(lmbda * w * u), jump(v, n)) * dS + \
     inner(lmbda * dot(w, n) * u, v) * ds + \
     kappa_const * (inner(grad(u), grad(v)) * dx -
                    inner(avg(grad(u)), jump(v, n)) * dS -
