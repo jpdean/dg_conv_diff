@@ -1,12 +1,10 @@
-# TODO Test diffusion, advection, advection-diffusion, and add Neumann
-# BC for Diffusion
-
 from dolfinx import mesh, fem, io
 import ufl
 from ufl import inner, dx, grad, dot, dS, jump, avg
 from mpi4py import MPI
 from petsc4py import PETSc
 import numpy as np
+from dolfinx.fem.petsc import assemble_matrix, create_vector, assemble_vector
 
 
 def norm_L2(comm, v):
@@ -37,8 +35,8 @@ def marker_Gamma_R(x):
 
 
 # Simulation parameters
-n = 64
-k = 1
+n = 32  # Number of cells in each direction
+k = 3  # Polynomial degree
 t_end = 10.0
 num_time_steps = 32
 # Diffusivity
@@ -51,7 +49,7 @@ w_y = 0.0
 
 msh = mesh.create_unit_square(MPI.COMM_WORLD, n, n)
 
-V = fem.FunctionSpace(msh, ("Discontinuous Lagrange", k))
+V = fem.functionspace(msh, ("Discontinuous Lagrange", k))
 
 u, v = ufl.TrialFunction(V), ufl.TestFunction(V)
 
@@ -68,7 +66,7 @@ n = ufl.FacetNormal(msh)
 # Simulation constants
 delta_t = fem.Constant(msh, PETSc.ScalarType(t_end / num_time_steps))
 alpha = fem.Constant(
-    msh, PETSc.ScalarType(10.0 * k**2))  # TODO Check k dependency
+    msh, PETSc.ScalarType(10.0 * k**2))
 kappa_const = fem.Constant(msh, PETSc.ScalarType(kappa))
 
 
@@ -99,7 +97,7 @@ alpha_R = fem.Constant(msh, PETSc.ScalarType(0.0))
 beta_R = fem.Constant(msh, PETSc.ScalarType(0.0))
 robin_bcs = {(boundary_id["Gamma_R"], (alpha_R, beta_R))}
 
-# Problem statement
+# Specify weak form of the problem
 lmbda = ufl.conditional(ufl.gt(dot(w, n), 0), 1, 0)
 a = inner(u / delta_t, v) * dx - \
     inner(w * u, grad(v)) * dx + \
@@ -137,9 +135,9 @@ for bc in robin_bcs:
 a = fem.form(a)
 L = fem.form(L)
 
-A = fem.petsc.assemble_matrix(a)
+A = assemble_matrix(a)
 A.assemble()
-b = fem.petsc.create_vector(L)
+b = create_vector(L)
 
 # Create solver
 ksp = PETSc.KSP().create(msh.comm)
@@ -148,7 +146,7 @@ ksp.setType("preonly")
 ksp.getPC().setType("lu")
 ksp.getPC().setFactorSolverType("superlu_dist")
 
-u_file = io.VTXWriter(msh.comm, "u.bp", [u_n._cpp_object])
+u_file = io.VTXWriter(msh.comm, "u.bp", [u_n._cpp_object], engine="BP4")
 
 # Time stepping loop
 t = 0.0
@@ -158,10 +156,10 @@ for n in range(num_time_steps):
 
     with b.localForm() as b_loc:
         b_loc.set(0.0)
-    fem.petsc.assemble_vector(b, L)
+    assemble_vector(b, L)
     b.ghostUpdate(addv=PETSc.InsertMode.ADD, mode=PETSc.ScatterMode.REVERSE)
 
-    ksp.solve(b, u_n.vector)
+    ksp.solve(b, u_n.x.petsc_vec)
     u_n.x.scatter_forward()
 
     u_file.write(t)
@@ -169,7 +167,7 @@ for n in range(num_time_steps):
 u_file.close()
 
 # Function spaces for exact solution
-V_e = fem.FunctionSpace(msh, ("Lagrange", k + 3))
+V_e = fem.functionspace(msh, ("Lagrange", k + 3))
 
 u_e = fem.Function(V_e)
 u_e.interpolate(u_e_expr)
